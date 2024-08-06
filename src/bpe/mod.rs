@@ -127,10 +127,9 @@ impl Bpe {
             "scores size mismatch with vocab size"
         );
         // tokens 中直接引用字符串位置，绑定评分
-        let ptr = NonNull::new(_vocab.as_ptr().cast_mut()).unwrap();
         let tokens = zip(meta, rank)
             .map(|((off, len), rank)| TokenMeta {
-                ptr: unsafe { ptr.add(off) },
+                ptr: unsafe { NonNull::new_unchecked(_vocab[off..].as_ptr().cast_mut()) },
                 len: len as _,
                 rank,
             })
