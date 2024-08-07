@@ -26,10 +26,12 @@ impl<M: Method> Tokeneer<M> {
     pub fn encode(&self, text: &str) -> Vec<utok> {
         let mut ans = Vec::new();
         let mut start = 0;
-        for m in self.special_regex.find_iter(text) {
-            ans.extend(self.method.encode(&text[start..m.start()]));
-            ans.extend_from_slice(&self.special[m.as_str()]);
-            start = m.end();
+        if !self.special_regex.as_str().is_empty() {
+            for m in self.special_regex.find_iter(text) {
+                ans.extend(self.method.encode(&text[start..m.start()]));
+                ans.extend_from_slice(&self.special[m.as_str()]);
+                start = m.end();
+            }
         }
         ans.extend(self.method.encode(&text[start..]));
         ans
