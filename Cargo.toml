@@ -8,3 +8,4 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 
 [dependencies]
 regex = "1.10"
+memchr = "2.7"

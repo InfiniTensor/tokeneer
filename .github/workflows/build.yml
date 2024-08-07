@@ -29,6 +29,10 @@ jobs:
       - name: Check format
         run: cargo fmt --check
 
+      - name: Download tokenizer.model
+        run: wget https://huggingface.co/TinyLlama/TinyLlama_v1.1/resolve/main/tokenizer.model
+        # run on windows: wget -Uri https://huggingface.co/TinyLlama/TinyLlama_v1.1/resolve/main/tokenizer.model -OutFile tokenizer.model
+
       - name: Run test
         run: cargo test
 
