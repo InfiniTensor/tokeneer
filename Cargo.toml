@@ -9,3 +9,4 @@ authors = ["YdrMaster <ydrml@hotmail.com>"]
 [dependencies]
 regex = "1.10"
 memchr = "2.7"
+patricia_tree = "0.8"

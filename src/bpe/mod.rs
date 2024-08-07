@@ -1,6 +1,11 @@
-﻿mod algorithm;
+﻿//! b-p-e for Byte Pair Encoding
 
-use crate::{utok, Method};
+mod algorithm;
+
+use crate::{
+    functions::{collect_vocabs_with_hint, CompressedVocab},
+    utok, Method,
+};
 use std::{
     collections::{HashMap, HashSet},
     iter::zip,
@@ -11,7 +16,7 @@ use std::{
 
 pub struct Bpe {
     /// 保存所有词的字符串内容，以 u8 为单位所以不需要对齐，占用空间少
-    _vocab: Pin<Box<[u8]>>,
+    _vocabs: Pin<Box<[u8]>>,
     /// 按 token 顺序保存元信息
     tokens: Box<[TokenMeta]>,
     /// 按字符串的字典序排序的 token 索引，用于从字符串二分查找 token。
@@ -46,7 +51,7 @@ impl Deref for TokenMeta {
 impl Bpe {
     /// 解析 tokenizer.model 文件并构造一个 bpe 分词器。
     pub fn from_tokenizer_model(model: &[u8]) -> Self {
-        // 遍历文件，标记所有词汇的位置并记录最大长度
+        // 遍历文件，标记所有词汇的位置
         let offsets = (0..)
             .scan(0usize, |offset, _| match &model[*offset..] {
                 [10, total_len, 10, content @ ..] => {
@@ -91,51 +96,9 @@ impl Bpe {
         is_byte: impl IntoIterator<Item = bool>,
         unk: utok,
     ) -> Self {
-        let mut bytes = Box::new([unk; 256]);
-        let mut total_len = 0;
-        // 收集词表字符内容和字节 token，同时计算内容总长度
-        let vocabs = zip(vocabs, is_byte)
-            .enumerate()
-            .map(|(i, (piece, is_byte))| {
-                let piece = if is_byte {
-                    const BYTES: [u8; 256] = {
-                        let mut bytes = [0u8; 256];
-                        let mut i = 0usize;
-                        while i < 256 {
-                            bytes[i] = i as _;
-                            i += 1;
-                        }
-                        bytes
-                    };
-
-                    let b = crate::as_byte_token(piece.as_bytes()).unwrap() as usize;
-                    bytes[b] = i as utok;
-                    std::slice::from_ref(&BYTES[b])
-                } else {
-                    piece.as_bytes()
-                };
-                total_len += piece.len();
-                piece
-            })
-            .collect::<Vec<_>>();
-        // 创建字符内容缓存
-        let mut slices = vec![(0usize, 0usize); vocabs.len()];
-        let mut text_buf = Vec::<u8>::with_capacity(total_len);
-        let mut indices = (0..vocabs.len()).collect::<Vec<_>>();
-        // 对词按内容长度从长到短排序，因为短的内容有可能是长内容的子串，可以避免重复存储相同内容
-        indices.sort_unstable_by_key(|&i| -(vocabs[i].len() as isize));
-        for i in indices {
-            let v = vocabs[i];
-            // 查找子串，若存在则复用，否则将新的内容追加到缓存
-            let off = memchr::memmem::find(&text_buf, v).unwrap_or_else(|| {
-                let off = text_buf.len();
-                text_buf.extend(v);
-                off
-            });
-            slices[i] = (off, v.len());
-        }
-        // 锁定字符串内容的位置，以实现安全的自引用
-        let _vocab = unsafe { Pin::new_unchecked(text_buf.into_boxed_slice()) };
+        let (vocabs, bytes, total_len) =
+            collect_vocabs_with_hint(vocabs.into_iter().map(|s| s.as_bytes()), is_byte, unk);
+        let CompressedVocab { vocabs, slices } = CompressedVocab::new(&vocabs, total_len);
         // 收集合词评分
         let scores = scores.into_iter().collect::<Vec<_>>();
         assert_eq!(
@@ -146,7 +109,7 @@ impl Bpe {
         // tokens 中直接引用字符串位置，绑定重新赋权并转换为整型的分词评分
         let tokens = zip(slices, rank(&scores))
             .map(|((off, len), rank)| TokenMeta {
-                ptr: unsafe { NonNull::new_unchecked(_vocab[off..].as_ptr().cast_mut()) },
+                ptr: unsafe { NonNull::new_unchecked(vocabs[off..].as_ptr().cast_mut()) },
                 len: len as _,
                 rank,
             })
@@ -160,13 +123,13 @@ impl Bpe {
         sorted_pieces.sort_unstable_by_key(|&i| &*tokens[i as usize]);
 
         // println!(
-        //     "Building BPE vocab, detected {} tokens, compressed to {} bytes from {len} bytes",
+        //     "Building BPE vocab, detected {} tokens, compressed to {} bytes from {total_len} bytes",
         //     tokens.len(),
-        //     _vocab.len(),
+        //     vocabs.len(),
         // );
 
         Self {
-            _vocab,
+            _vocabs: vocabs,
             tokens,
             sorted_pieces,
             bytes,
@@ -283,7 +246,7 @@ fn test() {
         println!(
             "bpe: detected {} tokens, compressed to {} bytes",
             bpe.vocab_size(),
-            bpe._vocab.len(),
+            bpe._vocabs.len(),
         );
         println!("inaccessible: {inaccessible:#?}");
     }
