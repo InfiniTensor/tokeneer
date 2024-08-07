@@ -1,10 +1,15 @@
 [package]
 name = "tokeneer"
+description = "Another tokenizer crate"
 version = "0.0.0"
 edition = "2021"
 authors = ["YdrMaster <ydrml@hotmail.com>"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+repository = "https://github.com/YdrMaster/tokeneer"
+documentation = "https://docs.rs/tokeneer"
+license = "MIT"
+readme = "README.md"
+keywords = ["tokenizer", "bpe", "nlp"]
+categories = ["algorithms", "encoding"]
 
 [dependencies]
 regex = "1.10"

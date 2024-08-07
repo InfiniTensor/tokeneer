@@ -1,6 +1,8 @@
 ﻿# Tokeneer
 
 [![CI](https://github.com/YdrMaster/tokeneer/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/YdrMaster/tokeneer/actions)
+[![Latest version](https://img.shields.io/crates/v/tokeneer.svg)](https://crates.io/crates/tokeneer)
+[![Documentation](https://docs.rs/tokeneer/badge.svg)](https://docs.rs/tokeneer)
 [![license](https://img.shields.io/github/license/YdrMaster/tokeneer)](https://mit-license.org/)
 ![GitHub repo size](https://img.shields.io/github/repo-size/YdrMaster/tokeneer)
 ![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/YdrMaster/tokeneer)
@@ -9,3 +11,5 @@
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/YdrMaster/tokeneer)](https://github.com/YdrMaster/tokeneer/pulls)
 ![GitHub contributors](https://img.shields.io/github/contributors/YdrMaster/tokeneer)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/m/YdrMaster/tokeneer)
+
+Another tokenizer crate.
