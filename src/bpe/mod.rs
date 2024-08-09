@@ -3,8 +3,9 @@
 mod algorithm;
 
 use crate::{
-    functions::{collect_vocabs_with_hint, CompressedVocab},
-    utok, Method,
+    utok,
+    vocab::{CollectedVocab, CompressedVocab},
+    Method,
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -37,6 +38,7 @@ struct TokenMeta {
     rank: u32,
 }
 
+// SAFETY: TokenMeta 中的指针是指向 Bpe 内容的自引用指针，且仅用于不可变引用。
 unsafe impl Send for TokenMeta {}
 unsafe impl Sync for TokenMeta {}
 
@@ -96,8 +98,15 @@ impl Bpe {
         is_byte: impl IntoIterator<Item = bool>,
         unk: utok,
     ) -> Self {
-        let (vocabs, bytes, total_len) =
-            collect_vocabs_with_hint(vocabs.into_iter().map(|s| s.as_bytes()), is_byte, unk);
+        let CollectedVocab {
+            vocabs,
+            total_len,
+            bytes,
+        } = CollectedVocab::collect_with_hint(
+            vocabs.into_iter().map(|s| s.as_bytes()),
+            is_byte,
+            unk,
+        );
         let CompressedVocab { vocabs, slices } = CompressedVocab::new(&vocabs, total_len);
         // 收集合词评分
         let scores = scores.into_iter().collect::<Vec<_>>();
@@ -189,7 +198,7 @@ impl Method for Bpe {
     }
     #[inline]
     fn encode(&self, text: &str) -> impl IntoIterator<Item = utok> + '_ {
-        let mut tokenizer = self.build_tokenizer(text);
+        let mut tokenizer = self.begin_merge(text);
         while tokenizer.merge() {}
         tokenizer.into_iter()
     }

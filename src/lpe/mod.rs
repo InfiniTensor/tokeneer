@@ -1,8 +1,9 @@
 ﻿//! l-p-e for Longest Prefix Encoding
 
 use crate::{
-    functions::{collect_vocabs, CompressedVocab},
-    utok, Method,
+    utok,
+    vocab::{CollectedVocab, CompressedVocab},
+    Method,
 };
 use patricia_tree::PatriciaMap;
 use std::{collections::HashSet, pin::Pin};
@@ -37,7 +38,11 @@ impl Lpe {
     }
 
     pub fn new<'a>(vocabs: impl IntoIterator<Item = &'a [u8]>, unk: utok) -> Self {
-        let (vocabs, bytes, total_len) = collect_vocabs(vocabs, unk);
+        let CollectedVocab {
+            vocabs,
+            total_len,
+            bytes,
+        } = CollectedVocab::collect(vocabs, unk);
         let CompressedVocab { vocabs, slices } = CompressedVocab::new(&vocabs, total_len);
         let tokens = slices
             .into_iter()

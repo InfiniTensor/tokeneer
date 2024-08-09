@@ -7,7 +7,7 @@ use std::{
     ops::Range,
 };
 
-pub struct BpeTokenizer<'v, 't> {
+pub struct MergeState<'v, 't> {
     text: &'t [u8],
     bpe: &'v Bpe,
     marks: Vec<Mark>,
@@ -26,7 +26,7 @@ pub struct Iter<'a> {
 }
 
 impl Bpe {
-    pub fn build_tokenizer<'v, 't>(&'v self, text: &'t str) -> BpeTokenizer<'v, 't> {
+    pub fn begin_merge<'v, 't>(&'v self, text: &'t str) -> MergeState<'v, 't> {
         let mut marks = vec![Mark::unk(self.unk); text.len()];
         let mut merges = BinaryHeap::new();
 
@@ -55,7 +55,7 @@ impl Bpe {
             };
         }
 
-        BpeTokenizer {
+        MergeState {
             text: text.as_bytes(),
             bpe: self,
             marks,
@@ -119,7 +119,7 @@ impl PartialOrd for Merge {
     }
 }
 
-impl BpeTokenizer<'_, '_> {
+impl MergeState<'_, '_> {
     /// 尝试执行一次合并，返回是否成功执行了一次合并。
     pub fn merge(&mut self) -> bool {
         // 一次合并将涉及至多 4 个 token：
@@ -203,7 +203,7 @@ impl BpeTokenizer<'_, '_> {
     }
 }
 
-impl<'v> IntoIterator for BpeTokenizer<'v, '_> {
+impl<'v> IntoIterator for MergeState<'v, '_> {
     type Item = utok;
     type IntoIter = IntoIter<'v>;
     #[inline]
@@ -244,7 +244,7 @@ impl Iterator for Iter<'_> {
     }
 }
 
-impl fmt::Display for BpeTokenizer<'_, '_> {
+impl fmt::Display for MergeState<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use std::str::{from_utf8, from_utf8_unchecked};
 

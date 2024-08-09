@@ -1,9 +1,9 @@
 #![deny(warnings)]
 
 mod bpe;
-mod functions;
 mod lpe;
 mod tokeneer;
+mod vocab;
 
 pub use bpe::Bpe;
 pub use lpe::Lpe;
