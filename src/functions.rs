@@ -38,7 +38,7 @@ pub(crate) fn collect_vocabs_with_hint<'s>(
     let vocabs = zip(vocabs, is_byte)
         .enumerate()
         .map(|(i, (piece, is_byte))| {
-            if is_byte {
+            let piece = if is_byte {
                 let b = as_byte_token(piece)
                     .unwrap_or_else(|| panic!("{piece:?} is not a valid byte token"))
                     as usize;
