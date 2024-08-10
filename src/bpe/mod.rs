@@ -1,4 +1,4 @@
-﻿//! b-p-e for Byte Pair Encoding
+//! b-p-e for Byte Pair Encoding
 
 mod algorithm;
 
@@ -283,8 +283,8 @@ mod bpe_tests {
 
         let encoded: Vec<_> = bpe.encode("abc").into_iter().collect();
         assert_eq!(encoded.len(), 2); // Should merge "ab" and leave "c"
-        assert_eq!(encoded[0], 3);    // Assuming "ab" is assigned token ID 3
-        assert_eq!(encoded[1], 2);    // Assuming "c" is assigned token ID 2
+        assert_eq!(encoded[0], 3); // Assuming "ab" is assigned token ID 3
+        assert_eq!(encoded[1], 2); // Assuming "c" is assigned token ID 2
     }
 
     #[test]
@@ -307,7 +307,10 @@ mod bpe_tests {
 
         let text = "abcbc";
         let encoded: Vec<_> = bpe.encode(text).into_iter().collect();
-        let decoded: Vec<u8> = encoded.iter().flat_map(|&t| bpe.decode(t).iter().copied()).collect();
+        let decoded: Vec<u8> = encoded
+            .iter()
+            .flat_map(|&t| bpe.decode(t).iter().copied())
+            .collect();
         assert_eq!(String::from_utf8(decoded).unwrap(), text);
     }
 
@@ -333,13 +336,22 @@ mod bpe_tests {
         println!("Inaccessible tokens: {:?}", inaccessible);
 
         // 'd' is a single character, so it should be accessible
-        assert!(!inaccessible.contains_key("d"), "Token 'd' should be accessible");
+        assert!(
+            !inaccessible.contains_key("d"),
+            "Token 'd' should be accessible"
+        );
 
         // 'bcd' cannot be formed by merging other tokens, so it should be inaccessible
-        assert!(inaccessible.contains_key("bcd"), "Token 'bcd' should be inaccessible");
+        assert!(
+            inaccessible.contains_key("bcd"),
+            "Token 'bcd' should be inaccessible"
+        );
 
         // 'ab' can be formed by merging 'a' and 'b', so it should be accessible
-        assert!(!inaccessible.contains_key("ab"), "Token 'ab' should be accessible");
+        assert!(
+            !inaccessible.contains_key("ab"),
+            "Token 'ab' should be accessible"
+        );
     }
 
     #[test]
