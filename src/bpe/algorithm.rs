@@ -222,7 +222,11 @@ impl Iterator for IntoIter<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         match &self.marks[self.i..] {
             &[Mark { token, .. }, ..] => {
-                self.i += self.bpe.token(token).len();
+                self.i += if token == self.bpe.unk {
+                    1
+                } else {
+                    self.bpe.token(token).len()
+                };
                 Some(token)
             }
             [] => None,
@@ -236,7 +240,11 @@ impl Iterator for Iter<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         match self.marks {
             &[Mark { token, .. }, ref tail @ ..] => {
-                self.marks = &tail[self.bpe.token(token).len() - 1..];
+                self.marks = if token == self.bpe.unk {
+                    tail
+                } else {
+                    &tail[self.bpe.token(token).len() - 1..]
+                };
                 Some(token)
             }
             [] => None,

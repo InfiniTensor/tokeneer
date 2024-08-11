@@ -265,73 +265,71 @@ mod bpe_tests {
         }
     }
 
+    fn test_bpe() -> Bpe {
+        Bpe::new(
+            [
+                "<unk>", //
+                "a", "b", "c", "d", //
+                "ab", "ac", "ad", "bd", //
+                "bcd",
+            ],
+            [
+                0., //
+                1., 1., 1., 1., //
+                1.1, 1.2, 1.3, 1.4, //
+                10.,
+            ],
+            [false; 10],
+            0,
+        )
+    }
+
     #[test]
     fn test_bpe_new() {
-        let vocabs = vec!["a", "b", "c", "ab", "bc"];
-        let scores = vec![1.0, 1.0, 1.0, 2.0, 2.0];
-        let is_byte = vec![false, false, false, false, false];
-        let bpe = Bpe::new(vocabs, scores, is_byte, 0);
-        assert_eq!(bpe.vocab_size(), 5);
-    }
-
-    #[test]
-    fn test_bpe_encode() {
-        let vocabs = vec!["a", "b", "c", "ab", "bc"];
-        let scores = vec![1.0, 1.0, 1.0, 2.0, 2.0];
-        let is_byte = vec![false, false, false, false, false];
-        let bpe = Bpe::new(vocabs, scores, is_byte, 0);
-
-        let encoded: Vec<_> = bpe.encode("abc").into_iter().collect();
-        assert_eq!(encoded.len(), 2); // Should merge "ab" and leave "c"
-        assert_eq!(encoded[0], 3); // Assuming "ab" is assigned token ID 3
-        assert_eq!(encoded[1], 2); // Assuming "c" is assigned token ID 2
-    }
-
-    #[test]
-    fn test_bpe_decode() {
-        let vocabs = vec!["a", "b", "c", "ab", "bc"];
-        let scores = vec![1.0, 1.0, 1.0, 2.0, 2.0];
-        let is_byte = vec![false, false, false, false, false];
-        let bpe = Bpe::new(vocabs, scores, is_byte, 0);
-
-        assert_eq!(bpe.decode(3), b"ab");
-        assert_eq!(bpe.decode(2), b"c");
-    }
-
-    #[test]
-    fn test_bpe_encode_decode() {
-        let vocabs = vec!["a", "b", "c", "ab", "bc"];
-        let scores = vec![1.0, 1.0, 1.0, 2.0, 2.0];
-        let is_byte = vec![false, false, false, false, false];
-        let bpe = Bpe::new(vocabs, scores, is_byte, 0);
-
-        let text = "abcbc";
-        let encoded: Vec<_> = bpe.encode(text).into_iter().collect();
-        let decoded: Vec<u8> = encoded
-            .iter()
-            .flat_map(|&t| bpe.decode(t).iter().copied())
-            .collect();
-        assert_eq!(String::from_utf8(decoded).unwrap(), text);
+        let bpe = test_bpe();
+        assert_eq!(bpe.vocab_size(), 10);
     }
 
     #[test]
     fn test_bpe_unk_token() {
-        let vocabs = vec!["a", "b", "c"];
-        let scores = vec![1.0, 1.0, 1.0];
-        let is_byte = vec![false, false, false];
-        let unk_token = 100;
-        let bpe = Bpe::new(vocabs, scores, is_byte, unk_token);
+        let bpe = test_bpe();
+        assert_eq!(bpe.unk_token(), 0);
+    }
 
-        assert_eq!(bpe.unk_token(), unk_token);
+    #[test]
+    fn test_bpe_encode() {
+        let bpe = test_bpe();
+        let encoded: Vec<_> = bpe.encode("abd").into_iter().collect();
+        assert_eq!(encoded, [1, 8]); // Should merge "bc" and leave "a"
+    }
+
+    #[test]
+    fn test_bpe_decode() {
+        let bpe = test_bpe();
+        assert_eq!(bpe.decode(3), b"c");
+        assert_eq!(bpe.decode(6), b"ac");
+        assert_eq!(bpe.decode(9), b"bcd");
+        assert_eq!(bpe.decode(0), b"<unk>");
+    }
+
+    #[test]
+    fn test_bpe_encode_decode() {
+        let bpe = test_bpe();
+
+        let text = "abcdx";
+        let encoded: Vec<_> = bpe.encode(text).into_iter().collect();
+        assert_eq!(encoded, [5, 3, 4, 0]);
+
+        let decoded: Vec<_> = encoded
+            .iter()
+            .flat_map(|&t| bpe.decode(t).iter().copied())
+            .collect();
+        assert_eq!(std::str::from_utf8(&decoded), Ok("abcd<unk>"));
     }
 
     #[test]
     fn test_bpe_inaccessible() {
-        let vocabs = vec!["a", "b", "c", "ab", "bcd", "d"];
-        let scores = vec![1.0, 1.0, 1.0, 2.0, 1.5, 1.0];
-        let is_byte = vec![false, false, false, false, false, false];
-        let bpe = Bpe::new(vocabs, scores, is_byte, 0);
-
+        let bpe = test_bpe();
         let inaccessible = bpe.inaccessible();
         println!("Inaccessible tokens: {:?}", inaccessible);
 
@@ -342,8 +340,9 @@ mod bpe_tests {
         );
 
         // 'bcd' cannot be formed by merging other tokens, so it should be inaccessible
-        assert!(
-            inaccessible.contains_key("bcd"),
+        assert_eq!(
+            inaccessible.get("bcd"),
+            Some(&9),
             "Token 'bcd' should be inaccessible"
         );
 
@@ -356,17 +355,12 @@ mod bpe_tests {
 
     #[test]
     fn test_bpe_with_byte_tokens() {
-        let vocabs = vec!["a", "b", "<0x41>", "<0x42>"];
-        let scores = vec![1.0, 1.0, 1.0, 1.0];
-        let is_byte = vec![false, false, true, true];
+        let vocabs = ["a", "b", "<0x41>", "<0x42>"];
+        let scores = [1.0, 1.0, 1.0, 1.0];
+        let is_byte = [false, false, true, true];
         let bpe = Bpe::new(vocabs, scores, is_byte, 0);
 
-        let input = "aAB";
-        let encoded: Vec<_> = bpe.encode(input).into_iter().collect();
-        println!("Input: {:?}", input);
-        println!("Encoded tokens: {:?}", encoded);
-        println!("Vocabulary size: {}", bpe.vocab_size());
-
-        assert_eq!(encoded.len(), 3, "Expected 3 tokens for input 'aAB'");
+        let encoded: Vec<_> = bpe.encode("aAB").into_iter().collect();
+        assert_eq!(encoded, [0, 2, 3], "Expected 3 tokens for input 'aAB'");
     }
 }
