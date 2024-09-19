@@ -66,8 +66,10 @@ impl Bpe {
             .collect::<Vec<_>>();
         // 产生词迭代器
         let vocabs = offsets.iter().map(|slice| {
-            let len = slice[0] as usize;
-            std::str::from_utf8(&slice[1..][..len]).unwrap()
+            let &&[len, ref content @ ..] = slice else {
+                unreachable!()
+            };
+            std::str::from_utf8(&content[..len as usize]).unwrap()
         });
         // 产生评分迭代器
         let scores = offsets.iter().map(|slice| {
@@ -75,21 +77,12 @@ impl Bpe {
             let ptr = slice[len + 2..].as_ptr().cast::<f32>();
             unsafe { ptr.read_unaligned() }
         });
-        // 产生字节标记迭代器
-        let mut i = 0;
-        let is_byte = std::iter::from_fn(|| {
-            if i < 3 {
-                i += 1;
-                Some(false)
-            } else if i < 3 + 256 {
-                i += 1;
-                Some(true)
-            } else {
-                Some(false)
-            }
-        });
         // 构造分词器
-        Self::new(vocabs, scores, is_byte, 0)
+        Self::from_collected_vocab(
+            CollectedVocab::collect(vocabs.into_iter().map(|s| s.as_bytes()), 0),
+            scores,
+            0,
+        )
     }
 
     pub fn new<'a>(
@@ -98,15 +91,27 @@ impl Bpe {
         is_byte: impl IntoIterator<Item = bool>,
         unk: utok,
     ) -> Self {
+        Self::from_collected_vocab(
+            CollectedVocab::collect_with_hint(
+                vocabs.into_iter().map(|s| s.as_bytes()),
+                is_byte,
+                unk,
+            ),
+            scores,
+            unk,
+        )
+    }
+
+    fn from_collected_vocab(
+        vocab: CollectedVocab,
+        scores: impl IntoIterator<Item = f32>,
+        unk: utok,
+    ) -> Self {
         let CollectedVocab {
             vocabs,
             total_len,
             bytes,
-        } = CollectedVocab::collect_with_hint(
-            vocabs.into_iter().map(|s| s.as_bytes()),
-            is_byte,
-            unk,
-        );
+        } = vocab;
         let CompressedVocab { vocabs, slices } = CompressedVocab::new(&vocabs, total_len);
         // 收集合词评分
         let scores = scores.into_iter().collect::<Vec<_>>();
@@ -215,9 +220,15 @@ fn rank(scores: &[f32]) -> impl IntoIterator<Item = u32> + '_ {
         collections::{BTreeMap, BTreeSet},
     };
 
-    #[derive(PartialEq, Debug)]
+    #[derive(Debug)]
     struct FloatOrd(f32);
     impl Eq for FloatOrd {}
+    impl PartialEq for FloatOrd {
+        #[inline]
+        fn eq(&self, other: &Self) -> bool {
+            self.0.total_cmp(&other.0).is_eq()
+        }
+    }
     impl PartialOrd for FloatOrd {
         #[inline]
         fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

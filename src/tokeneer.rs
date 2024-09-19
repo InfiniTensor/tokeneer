@@ -1,11 +1,32 @@
 ﻿use crate::{utok, Method};
 use regex::Regex;
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+    slice::from_ref,
+    sync::LazyLock,
+};
 
 pub struct Tokeneer<M> {
     method: M,
-    special: HashMap<String, Vec<utok>>,
+    special: HashMap<String, TokenSeq>,
     special_regex: Regex,
+}
+
+enum TokenSeq {
+    Single(utok),
+    Multi(Box<[utok]>),
+}
+
+impl Deref for TokenSeq {
+    type Target = [utok];
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Single(t) => from_ref(t),
+            Self::Multi(t) => t,
+        }
+    }
 }
 
 impl<M: Method> Tokeneer<M> {
@@ -13,7 +34,8 @@ impl<M: Method> Tokeneer<M> {
         let special = method
             .internal_special()
             .into_iter()
-            .map(|(k, v)| (k.to_string(), vec![v]))
+            .filter(|(k, _)| k.is_ascii())
+            .map(|(k, v)| (k.to_string(), TokenSeq::Single(v)))
             .collect::<HashMap<_, _>>();
         let special_regex = build_pattern(special.keys());
         Self {
@@ -53,10 +75,10 @@ impl<M> Tokeneer<M> {
         for (k, v) in patterns {
             match self.special.entry(k) {
                 Occupied(entry) => {
-                    assert_eq!(entry.get(), &v);
+                    assert_eq!(&**entry.get(), &v);
                 }
                 Vacant(entry) => {
-                    entry.insert(v);
+                    entry.insert(TokenSeq::Multi(v.into_boxed_slice()));
                     any = true;
                 }
             }
@@ -72,15 +94,24 @@ impl<M> Tokeneer<M> {
     }
 }
 
-fn build_pattern<T: AsRef<str>>(text: impl IntoIterator<Item = T>) -> Regex {
+fn build_pattern<'a>(text: impl IntoIterator<Item = &'a String>) -> Regex {
+    static SPECIAL: LazyLock<HashSet<char>> = LazyLock::new(|| {
+        HashSet::from([
+            '*', '.', '?', '+', '^', '$', '|', '/', '\\', '(', ')', '[', ']', '{', '}',
+        ])
+    });
+
     let mut pattern = String::new();
-    let mut iter = text.into_iter();
-    if let Some(p) = iter.next() {
-        pattern.push_str(p.as_ref());
-    }
-    for p in iter {
+    for p in text {
+        for c in p.chars() {
+            if SPECIAL.contains(&c) {
+                pattern.push('\\');
+            }
+            pattern.push(c);
+        }
         pattern.push('|');
-        pattern.push_str(p.as_ref());
     }
+    pattern.pop();
+
     Regex::new(&pattern).unwrap()
 }
