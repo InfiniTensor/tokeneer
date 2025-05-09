@@ -12,10 +12,10 @@ keywords = ["tokenizer", "bpe", "nlp"]
 categories = ["algorithms", "encoding"]
 
 [dependencies]
+ggus = { git = "https://github.com/InfiniTensor/gguf", rev = "23c362f" }
 regex = "1.11"
 memchr = "2.7"
 patricia_tree = "0.9"
 log = "0.4"
 fancy-regex = "0.14.0"
-ggus = "0.4"
 memmap2 = "0.9"

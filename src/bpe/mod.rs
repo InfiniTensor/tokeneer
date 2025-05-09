@@ -259,7 +259,7 @@ impl Bpe {
                     }
                     Err(_) => Tokeneer::new(Bpe::new(
                         vocabs,
-                        std::iter::repeat(0.0).take(token_len),
+                        std::iter::repeat_n(0., token_len),
                         token_type,
                         unk,
                         Model::GPT2(fancy_regex::Regex::new(regex_str).unwrap()),
@@ -332,22 +332,22 @@ impl Method for Bpe {
         vocab.into_iter()
     }
     #[inline]
-    fn decode(&self, token: utok) -> Cow<'_, [u8]> {
+    fn decode(&self, token: utok) -> Cow<[u8]> {
         match &self.modeltype {
-            Model::GPT2(_) => match self.special.contains(&token) {
-                true => {
+            Model::GPT2(_) => {
+                if self.special.contains(&token) {
                     // 特殊token 直接返回
                     std::borrow::Cow::Borrowed(self.token(token))
+                } else {
+                    llama_decode_text(&String::from_utf8_lossy(self.token(token)))
+                        .into_bytes()
+                        .into()
                 }
-                false => llama_decode_text(&String::from_utf8_lossy(self.token(token)))
-                    .into_bytes()
-                    .into(),
-            },
-
+            }
             Model::LLaMa => {
                 let token_str = String::from_utf8_lossy(self.token(token));
                 let decoded_str = self.pre_decode(&token_str);
-                Cow::Owned(decoded_str.into_owned().into_bytes())
+                decoded_str.into_owned().into_bytes().into()
             }
         }
     }
@@ -499,7 +499,7 @@ mod bpe_tests {
             .internal_special()
             .into_iter()
             .collect::<HashMap<_, _>>();
-        println!("Inaccessible tokens: {:?}", inaccessible);
+        println!("Inaccessible tokens: {inaccessible:?}");
 
         // 'd' is a single character, so it should be accessible
         assert!(
