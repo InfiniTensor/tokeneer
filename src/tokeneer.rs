@@ -61,7 +61,7 @@ impl<M: Method> Tokeneer<M> {
     pub fn decode(&self, tokens: &[utok]) -> String {
         let mut ans = Vec::new();
         for &t in tokens {
-            ans.extend_from_slice(self.method.decode(t))
+            ans.extend_from_slice(&self.method.decode(t))
         }
         String::from_utf8(ans).unwrap()
     }

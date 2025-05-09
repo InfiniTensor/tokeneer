@@ -1,8 +1,14 @@
-﻿//! 这个模块提供对词表的预处理功能，这些功能适用于多种不同算法的分词器。
+//! 这个模块提供对词表的预处理功能，这些功能适用于多种不同算法的分词器。
 
 use crate::utok;
 use log::trace;
-use std::{iter::zip, pin::Pin, slice::from_ref, str::from_utf8_unchecked};
+use std::{
+    collections::{HashSet, hash_set},
+    iter::zip,
+    pin::Pin,
+    slice::from_ref,
+    str::from_utf8_unchecked,
+};
 
 /// 收集和预处理词表。
 ///
@@ -22,6 +28,9 @@ pub(crate) struct CollectedVocab<'s> {
     pub bytes: Box<[utok; 256]>,
     /// 特殊词汇
     pub special: Box<[utok]>,
+    // 判断对话终止字符，预留的收集终止推理的token
+    #[allow(dead_code)]
+    pub eog: HashSet<utok>,
     /// 填充词
     pub unk: utok,
 }
@@ -47,6 +56,7 @@ impl<'s> CollectedVocab<'s> {
 
         let mut vocabs = Vec::new();
         let mut special = Vec::new();
+        let mut eog = hash_set::HashSet::new();
         for (i, (piece, tt)) in zip(vocabs_, token_type).enumerate() {
             let piece = match tt {
                 TokenType::Byte => {
@@ -63,20 +73,20 @@ impl<'s> CollectedVocab<'s> {
                     trace!("find {tt:?}: {} @ {i}", unsafe {
                         from_utf8_unchecked(piece)
                     });
+                    if Self::is_eog(tt, piece) {
+                        eog.insert(i as _);
+                    }
                     special.push(i as _);
                     piece
                 }
-                _ => {
-                    let piece = match as_byte_token(piece) {
-                        Some(b) => {
-                            let b = b as usize;
-                            bytes[b] = i as _;
-                            from_ref(&BYTES[b])
-                        }
-                        None => piece,
-                    };
-                    piece
-                }
+                _ => match as_byte_token(piece) {
+                    Some(b) => {
+                        let b = b as usize;
+                        bytes[b] = i as _;
+                        from_ref(&BYTES[b])
+                    }
+                    None => piece,
+                },
             };
             vocabs.push(piece);
             total_len += piece.len()
@@ -86,7 +96,24 @@ impl<'s> CollectedVocab<'s> {
             total_len,
             bytes,
             special: special.into_boxed_slice(),
+            eog,
             unk,
+        }
+    }
+    pub fn is_eog(tt: TokenType, piece: &[u8]) -> bool {
+        match tt {
+            TokenType::Control => {
+                let key = unsafe { from_utf8_unchecked(piece) };
+                key == "<|eot_id|>"
+                    || key == "<|im_end|>"
+                    || key == "<|end|>"
+                    || key == "<end_of_turn>"
+                    || key == "<|endoftext|>"
+                    || key == "<|eom_id|>"
+                    || key == "< EOT >"
+                    || key == "_< EOT >"
+            }
+            _ => false,
         }
     }
 }

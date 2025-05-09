@@ -63,6 +63,7 @@ impl Lpe {
             bytes,
             special,
             unk,
+            ..
         } = vocab;
 
         let CompressedVocab { vocabs, slices } = if map_utf8 {
@@ -164,8 +165,8 @@ impl Method for Lpe {
         tokens
     }
     #[inline]
-    fn decode(&self, token: utok) -> &[u8] {
-        self.token(token)
+    fn decode(&self, token: utok) -> Cow<'_, [u8]> {
+        std::borrow::Cow::Borrowed(self.token(token))
     }
 }
 
