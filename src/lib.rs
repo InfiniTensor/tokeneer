@@ -16,17 +16,28 @@ pub use vocab::TokenType;
 /// `utok` for token id.
 #[allow(non_camel_case_types)]
 pub type utok = u32;
-//  添加判断终止符的函数
+
+// 添加判断终止符的函数
 pub trait Method {
     fn unk_token(&self) -> utok;
     fn vocab_size(&self) -> usize;
     fn internal_special(&self) -> impl IntoIterator<Item = (&str, utok)>;
     fn encode(&self, text: &str) -> impl IntoIterator<Item = utok> + '_;
-    fn decode(&self, token: utok) -> Cow<[u8]>;
+    fn decode(&self, token: utok, buf: &mut TextBuf) -> Cow<[u8]>;
     fn pre_encode<'s>(&self, text: &'s str) -> Cow<'s, str> {
         text.into()
     }
     fn pre_decode<'s>(&self, text: &'s str) -> Cow<'s, str> {
         text.into()
+    }
+}
+
+#[derive(Clone, Default)]
+#[repr(transparent)]
+pub struct TextBuf(Vec<u8>);
+
+impl TextBuf {
+    pub fn new() -> Self {
+        Default::default()
     }
 }

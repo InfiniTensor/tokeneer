@@ -71,13 +71,12 @@ pub fn unicode_utf8_to_byte(utf8: char) -> u8 {
     *UTF8_TO_BYTE.get(&utf8).unwrap()
 }
 
-pub fn llama_decode_text(text: &str) -> String {
-    let bytes = text.chars().map(unicode_utf8_to_byte).collect::<Vec<_>>();
-    String::from_utf8_lossy(&bytes).to_string()
+pub fn llama_decode_text(text: &str) -> Vec<u8> {
+    text.chars().map(unicode_utf8_to_byte).collect()
 }
 
 #[test]
-fn bpe_from_gguf() {
+fn convert() {
     let s = String::from("你好");
     let p: String = s
         .into_bytes()
@@ -86,7 +85,34 @@ fn bpe_from_gguf() {
         .collect();
     print!("dsf {p:?}");
     assert!(p == "ä½łå¥½");
-    let a = llama_decode_text("Ġthere");
+    let string =
+        unsafe { String::from_utf8_unchecked(vec![196, 160, 195, 165, 194, 165, 196, 169]) };
+    let a = llama_decode_text(&string);
     println!("dsf {a:?}");
     // println!("ds {:?}",b.get(&'▁').unwrap());
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{Bpe, TextBuf};
+    use ggus::GGuf;
+    use std::fs::File;
+
+    #[test]
+    fn bpe_from_gguf() {
+        println!("1");
+        let gguf =
+            File::open("/home/yangderui/repos/DeepSeek-R1-Distill-Qwen-32B-v0.0-F16.gguf").unwrap();
+        println!("2");
+        let gguf = unsafe { memmap2::Mmap::map(&gguf) }.unwrap();
+        println!("3");
+        let gguf = GGuf::new(&gguf).unwrap();
+        println!("4");
+        let tokeneer = Bpe::from_gguf(&gguf);
+        println!("5");
+        let mut buf = TextBuf::new();
+        let ans = tokeneer.decode(&[4891, 98, 229], &mut buf);
+        println!("{ans} {:?}", ans.as_bytes());
+        println!("6");
+    }
 }

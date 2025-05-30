@@ -6,7 +6,7 @@ use ggus::{GGmlTokenType, GGufMetaMapExt};
 use log::warn;
 
 use crate::{
-    Method, Tokeneer,
+    Method, TextBuf, Tokeneer,
     common::TOKENIZER_PRE_QWEN,
     utils::{llama_decode_text, unicode_byte_to_utf8},
     utok,
@@ -276,18 +276,19 @@ impl Method for Bpe {
     fn unk_token(&self) -> utok {
         self.unk
     }
+
     #[inline]
     fn vocab_size(&self) -> usize {
         self.tokens.len()
     }
-    #[inline]
+
     fn internal_special(&self) -> impl IntoIterator<Item = (&str, utok)> {
         self.special.iter().map(|&t| {
             let s = unsafe { std::str::from_utf8_unchecked(self.token(t)) };
             (s, t)
         })
     }
-    #[inline]
+
     fn encode(&self, text: &str) -> impl IntoIterator<Item = utok> + '_ {
         let text = self.pre_encode(text);
         let mut vocab = Vec::new();
@@ -331,17 +332,29 @@ impl Method for Bpe {
         }
         vocab.into_iter()
     }
-    #[inline]
-    fn decode(&self, token: utok) -> Cow<[u8]> {
+
+    fn decode(&self, token: utok, buf: &mut TextBuf) -> Cow<[u8]> {
         match &self.modeltype {
             Model::GPT2(_) => {
                 if self.special.contains(&token) {
                     // 特殊token 直接返回
-                    std::borrow::Cow::Borrowed(self.token(token))
+                    Cow::Borrowed(self.token(token))
                 } else {
-                    llama_decode_text(&String::from_utf8_lossy(self.token(token)))
-                        .into_bytes()
-                        .into()
+                    buf.0.extend(&**self.token(token));
+
+                    let out = match std::str::from_utf8(&buf.0) {
+                        Ok(str) => llama_decode_text(str),
+                        Err(_) => {
+                            return Cow::Borrowed(&[]);
+                        }
+                    };
+                    match std::str::from_utf8(&out) {
+                        Ok(_) => {
+                            buf.0.clear();
+                            Cow::Owned(out)
+                        }
+                        Err(_) => Cow::Borrowed(&[]),
+                    }
                 }
             }
             Model::LLaMa => {
@@ -351,12 +364,14 @@ impl Method for Bpe {
             }
         }
     }
+
     fn pre_encode<'s>(&self, text: &'s str) -> Cow<'s, str> {
         match &self.modeltype {
             Model::GPT2(_) => text.into(),
             Model::LLaMa => text.replace(" ", "\u{2581}").into(),
         }
     }
+
     fn pre_decode<'s>(&self, text: &'s str) -> Cow<'s, str> {
         match &self.modeltype {
             Model::GPT2(_) => text.into(),
@@ -470,11 +485,12 @@ mod bpe_tests {
 
     #[test]
     fn test_bpe_decode() {
+        let mut buf = TextBuf::new();
         let bpe = test_bpe();
-        assert_eq!(&*bpe.decode(3), b"c");
-        assert_eq!(&*bpe.decode(6), b"ac");
-        assert_eq!(&*bpe.decode(9), b"bcd");
-        assert_eq!(&*bpe.decode(0), b"<unk>");
+        assert_eq!(&*bpe.decode(3, &mut buf), b"c");
+        assert_eq!(&*bpe.decode(6, &mut buf), b"ac");
+        assert_eq!(&*bpe.decode(9, &mut buf), b"bcd");
+        assert_eq!(&*bpe.decode(0, &mut buf), b"<unk>");
     }
 
     #[test]
@@ -485,9 +501,10 @@ mod bpe_tests {
         let encoded: Vec<_> = bpe.encode(text).into_iter().collect();
         assert_eq!(encoded, [5, 3, 4, 0]);
 
+        let mut buf = TextBuf::new();
         let decoded: Vec<_> = encoded
             .iter()
-            .flat_map(|&t| bpe.decode(t).iter().copied().collect::<Vec<_>>())
+            .flat_map(|&t| bpe.decode(t, &mut buf).iter().copied().collect::<Vec<_>>())
             .collect();
         assert_eq!(std::str::from_utf8(&decoded), Ok("abcd<unk>"))
     }

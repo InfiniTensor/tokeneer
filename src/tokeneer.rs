@@ -1,4 +1,4 @@
-﻿use crate::{Method, utok};
+﻿use crate::{Method, TextBuf, utok};
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
@@ -58,10 +58,10 @@ impl<M: Method> Tokeneer<M> {
         ans
     }
 
-    pub fn decode(&self, tokens: &[utok]) -> String {
+    pub fn decode(&self, tokens: &[utok], buf: &mut TextBuf) -> String {
         let mut ans = Vec::new();
         for &t in tokens {
-            ans.extend_from_slice(&self.method.decode(t))
+            ans.extend_from_slice(&self.method.decode(t, buf))
         }
         String::from_utf8(ans).unwrap()
     }

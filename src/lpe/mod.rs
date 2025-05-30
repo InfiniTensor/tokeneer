@@ -1,7 +1,7 @@
 ﻿//! l-p-e for Longest Prefix Encoding
 
 use crate::{
-    Method, utok,
+    Method, TextBuf, utok,
     vocab::{CollectedVocab, CompressedVocab, TokenType},
 };
 use patricia_tree::PatriciaMap;
@@ -165,7 +165,7 @@ impl Method for Lpe {
         tokens
     }
     #[inline]
-    fn decode(&self, token: utok) -> Cow<[u8]> {
+    fn decode(&self, token: utok, _buf: &mut TextBuf) -> Cow<[u8]> {
         self.token(token).into()
     }
 }
