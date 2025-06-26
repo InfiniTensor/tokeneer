@@ -2,9 +2,6 @@
 
 mod algorithm;
 
-use ggus::{GGmlTokenType, GGufMetaMapExt};
-use log::warn;
-
 use crate::{
     Method, TextBuf, Tokeneer,
     common::TOKENIZER_PRE_QWEN,
@@ -12,12 +9,19 @@ use crate::{
     utok,
     vocab::{CollectedVocab, CompressedVocab, TokenType},
 };
-use std::{borrow::Cow, collections::HashSet, iter::zip, ops::Deref, pin::Pin, ptr::NonNull};
+use ggus::{GGmlTokenType, GGufMetaMapExt};
+use log::warn;
+use std::{
+    borrow::Cow, collections::HashSet, iter::zip, ops::Deref, pin::Pin, ptr::NonNull,
+    str::from_utf8,
+};
+
 // 只用于分词，是否判断停止让，tokeneer做，弱国要支持gpt2要添加
 pub enum Model {
     GPT2(fancy_regex::Regex),
     LLaMa,
 }
+
 pub struct Bpe {
     /// 保存所有词的字符串内容，以 u8 为单位所以不需要对齐，占用空间少
     _vocabs: Pin<Box<[u8]>>,
@@ -75,7 +79,7 @@ impl Bpe {
             let &&[len, ref content @ ..] = slice else {
                 unreachable!()
             };
-            std::str::from_utf8(&content[..len as usize]).unwrap()
+            from_utf8(&content[..len as usize]).unwrap()
         });
         // 产生评分迭代器
         let scores = offsets.iter().map(|slice| {
@@ -338,29 +342,33 @@ impl Method for Bpe {
             Model::GPT2(_) => {
                 if self.special.contains(&token) {
                     // 特殊token 直接返回
-                    Cow::Borrowed(self.token(token))
-                } else {
-                    buf.0.extend(&**self.token(token));
+                    return Cow::Borrowed(self.token(token));
+                }
+                buf.0.extend(&**self.token(token));
 
-                    let out = match std::str::from_utf8(&buf.0) {
-                        Ok(str) => llama_decode_text(str),
-                        Err(_) => {
-                            return Cow::Borrowed(&[]);
-                        }
-                    };
-                    match std::str::from_utf8(&out) {
-                        Ok(_) => {
-                            buf.0.clear();
-                            Cow::Owned(out)
-                        }
-                        Err(_) => Cow::Borrowed(&[]),
+                let out = match from_utf8(&buf.0) {
+                    Ok(str) => llama_decode_text(str),
+                    Err(_) => return Cow::Borrowed(&[]),
+                };
+                match from_utf8(&out) {
+                    Ok(_) => {
+                        buf.0.clear();
+                        Cow::Owned(out)
                     }
+                    Err(_) => Cow::Borrowed(&[]),
                 }
             }
             Model::LLaMa => {
-                let token_str = String::from_utf8_lossy(self.token(token));
-                let decoded_str = self.pre_decode(&token_str);
-                decoded_str.into_owned().into_bytes().into()
+                buf.0.extend(&**self.token(token));
+
+                match from_utf8(&buf.0) {
+                    Ok(str) => {
+                        let out = self.pre_decode(str).bytes().collect();
+                        buf.0.clear();
+                        Cow::Owned(out)
+                    }
+                    Err(_) => Cow::Borrowed(&[]),
+                }
             }
         }
     }
