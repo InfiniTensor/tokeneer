@@ -246,7 +246,7 @@ impl Bpe {
             "gpt2" => {
                 let pre_type = gguf.get_str("tokenizer.ggml.pre").unwrap();
                 let regex_str = match pre_type {
-                    "qwen2" | "deepseek-r1-qwen" => TOKENIZER_PRE_QWEN,
+                    "qwen2" | "deepseek-r1-qwen" | "olmo" => TOKENIZER_PRE_QWEN,
                     _ => unimplemented!("not supported pre_type {}", pre_type),
                 };
                 match scores {
@@ -337,7 +337,7 @@ impl Method for Bpe {
         vocab.into_iter()
     }
 
-    fn decode(&self, token: utok, buf: &mut TextBuf) -> Cow<[u8]> {
+    fn decode(&self, token: utok, buf: &mut TextBuf) -> Cow<'_, [u8]> {
         match &self.modeltype {
             Model::GPT2(_) => {
                 if self.special.contains(&token) {

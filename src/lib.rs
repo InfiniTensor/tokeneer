@@ -23,7 +23,7 @@ pub trait Method {
     fn vocab_size(&self) -> usize;
     fn internal_special(&self) -> impl IntoIterator<Item = (&str, utok)>;
     fn encode(&self, text: &str) -> impl IntoIterator<Item = utok> + '_;
-    fn decode(&self, token: utok, buf: &mut TextBuf) -> Cow<[u8]>;
+    fn decode(&self, token: utok, buf: &mut TextBuf) -> Cow<'_, [u8]>;
     fn pre_encode<'s>(&self, text: &'s str) -> Cow<'s, str> {
         text.into()
     }
