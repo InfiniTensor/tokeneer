@@ -195,7 +195,7 @@ impl MergeState<'_, '_> {
     }
 
     #[inline]
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             bpe: self.bpe,
             marks: &self.marks,

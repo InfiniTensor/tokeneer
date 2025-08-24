@@ -165,7 +165,7 @@ impl Method for Lpe {
         tokens
     }
     #[inline]
-    fn decode(&self, token: utok, _buf: &mut TextBuf) -> Cow<[u8]> {
+    fn decode(&self, token: utok, _buf: &mut TextBuf) -> Cow<'_, [u8]> {
         self.token(token).into()
     }
 }
